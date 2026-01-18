@@ -1,0 +1,5 @@
+{
+  "name": "ImmoSimul - Simulateur de Rentabilité",
+  "description": "Un simulateur complet pour investissement immobilier calculant la rentabilité, le cashflow et le taux d'endettement en temps réel, assisté par IA.",
+  "requestFramePermissions": []
+}

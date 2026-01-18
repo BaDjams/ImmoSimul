@@ -59,7 +59,7 @@ export const calculateResults = (data: SimulationData): SimulationResults => {
     if (lot.usage === 'locatif_nu' || lot.usage === 'locatif_meuble') {
         const loyer = lot.loyerMensuel || 0;
         totalLoyerMensuelBrut += loyer;
-        totalRevenuLocatifAnnuelReel += (loyer * (12 - data.vacanceLocative));
+        totalRevenuLocatifAnnuelReel += (loyer * (12 - data.vacanceLocative / 100 * 12));
     } else if (lot.usage === 'saisonnier' || lot.usage === 'residence_secondaire') {
         const annuel = lot.revenuSaisonnierAnnuel || 0;
         totalLoyerMensuelBrut += (annuel / 12);
@@ -71,14 +71,24 @@ export const calculateResults = (data: SimulationData): SimulationResults => {
     }
   });
 
-  const revenusLocatifsPonderes = totalRevenuLocatifAnnuelReel / 12 * 0.7;
+  const revenusLocatifsPonderes = (totalRevenuLocatifAnnuelReel / 12) * 0.7;
   const totalRevenusBancaires = revenusFoyerTotal + revenusLocatifsPonderes;
   
-  const chargesAvant = data.chargesFoyer + data.creditsExistants;
-  const tauxEndettementAvant = revenusFoyerTotal > 0 ? (chargesAvant / revenusFoyerTotal) * 100 : 0;
+  // LOGIQUE BANCAIRE STRICTE : L'endettement ne concerne QUE les CRÉDITS (existants + nouveau)
+  // On ignore data.chargesFoyer (Loyer) car ce n'est pas une dette bancaire.
+  const dettesMensuellesActuelles = data.creditsExistants;
+  const dettesMensuellesFutures = dettesMensuellesActuelles + mensualiteTotale;
 
-  const chargesApres = chargesAvant + mensualiteTotale;
-  const tauxEndettementApres = totalRevenusBancaires > 0 ? (chargesApres / totalRevenusBancaires) * 100 : 0;
+  const tauxEndettementAvant = revenusFoyerTotal > 0 
+    ? (dettesMensuellesActuelles / revenusFoyerTotal) * 100 
+    : 0;
+
+  const tauxEndettementApres = totalRevenusBancaires > 0 
+    ? (dettesMensuellesFutures / totalRevenusBancaires) * 100 
+    : 0;
+
+  // RESTE À VIVRE : Ici on soustrait TOUT (Crédits + Loyer actuel)
+  const resteAVivreMensuel = totalRevenusBancaires - (dettesMensuellesFutures + data.chargesFoyer);
 
   let cashflowMensuel = 0;
   let rentabiliteBrute = 0;
@@ -107,6 +117,7 @@ export const calculateResults = (data: SimulationData): SimulationResults => {
     tauxEndettementAvant,
     tauxEndettementApres,
     rentabiliteBrute,
-    rentabiliteNette
+    rentabiliteNette,
+    resteAVivreMensuel
   };
 };

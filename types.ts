@@ -15,7 +15,7 @@ export interface Lot {
   surface: number;
   usage: UsageLot;
   loyerMensuel?: number;
-  revenuSaisonnierAnnuel?: number; // Utilisable aussi pour résidence secondaire louée
+  revenuSaisonnierAnnuel?: number;
 }
 
 export interface SimulationData {
@@ -26,7 +26,7 @@ export interface SimulationData {
   apportDisponible: number;
 
   lots: Lot[];
-  contexteProjet: string; // NOUVEAU: Informations complémentaires
+  contexteProjet: string;
   
   prixBien: number;
   fraisAgence: number;
@@ -56,4 +56,5 @@ export interface SimulationResults {
   tauxEndettementApres: number;
   rentabiliteBrute: number;
   rentabiliteNette: number;
+  resteAVivreMensuel: number;
 }

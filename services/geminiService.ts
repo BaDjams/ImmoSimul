@@ -10,77 +10,70 @@ export const analyzeInvestment = async (data: SimulationData, results: Simulatio
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const partnersDesc = data.partenaires.map(p => 
-    `- ${p.nom} (${p.statut.toUpperCase()}): ${p.revenusNet}€ net/mois`
+    `- ${p.nom} (Statut: ${p.statut.toUpperCase()}): ${p.revenusNet} € net mensuel`
   ).join('\n');
+
+  const commonInstructions = `
+    TON ET STYLE :
+    - Utilisez exclusivement le vouvoiement.
+    - Adoptez un ton formel, institutionnel, analytique et neutre.
+    - Bannissez tout langage sensationnaliste, commercial ou informel ("ultra rentable", "pépite", "super affaire", "tu", "ton").
+    - Employez un lexique financier et immobilier précis : ratio de couverture de dette, LTV, vacance locative, pression fiscale, solvabilité, capacité d'autofinancement.
+    - Structurez votre réponse avec des titres clairs.
+  `;
 
   let prompt = '';
 
   if (data.prixBien === 0) {
-    // MODE STRATÉGIE / RECHERCHE
     prompt = `
-      Agis en tant qu'expert en stratégie patrimoniale et courtier immobilier.
-      L'utilisateur souhaite investir mais n'a pas encore défini de bien (Prix d'achat = 0). Il cherche à connaître sa capacité d'action.
+      ${commonInstructions}
+      CONTEXTE : Cabinet de conseil en stratégie patrimoniale. Étude de faisabilité pour un investisseur sans bien cible défini.
 
-      PROFIL FINANCIER :
+      DONNÉES FINANCIÈRES :
       ${partnersDesc}
-      - Revenus fonciers actuels: ${data.revenusFonciersExistants}€/mois
-      - Charges/Crédits actuels: ${data.chargesFoyer}€/mois
-      - Apport disponible: ${data.apportDisponible}€
-      
-      PARAMÈTRES DE MARCHÉ :
-      - Durée emprunt envisagée: ${data.dureeEmpruntAnnee} ans
-      - Taux estimé: ${data.tauxInteret}%
-      
-      CONTEXTE & OBJECTIFS :
-      "${data.contexteProjet || 'Non spécifié'}"
+      - Revenus fonciers existants: ${data.revenusFonciersExistants} €/mois
+      - Loyer actuel (charge de vie): ${data.chargesFoyer} €/mois
+      - Crédits en cours (engagements bancaires): ${data.creditsExistants} €/mois
+      - Apport disponible: ${data.apportDisponible} €
+      - Paramètres de financement envisagés: ${data.dureeEmpruntAnnee} ans à ${data.tauxInteret} %
 
-      TA MISSION :
-      1. **Capacité d'Emprunt Maximale** : Calcule l'enveloppe brute en respectant les 35% d'endettement.
-      2. **Budget Cible (Projet)** : Déduis un budget d'achat cohérent (Capacité + Apport - Frais notaire/agence estimés).
-      3. **Scénarios de Rentabilité** : Pour que ce projet soit financé, quel niveau de loyer la banque attendra-t-elle ? Donne un ratio Loyer/Mensualité crédible (ex: couverture de 70% ou cashflow positif requis ?).
-      4. **Recommandation Stratégique** : Quel type de bien viser avec ce budget (T2 ville moyenne, immeuble de rapport, garage, etc.) ?
-
-      Format Markdown, sois précis, chiffré et direct.
+      VOTRE MISSION :
+      1. Déterminer l'enveloppe d'investissement maximale théorique en respectant le critère prudentiel de 35% d'endettement (basé sur les crédits).
+      2. Établir une stratégie d'acquisition cohérente avec le profil de l'investisseur.
+      3. Préciser les exigences bancaires prévisibles au regard de la situation financière décrite.
     `;
   } else {
-    // MODE ANALYSE DE PROJET EXISTANT
     const lotsDesc = data.lots.map(l => {
         let rev = '';
-        if (l.usage === 'locatif_nu' || l.usage === 'locatif_meuble' || l.usage === 'commercial') rev = `Loyer: ${l.loyerMensuel}€/mois`;
-        if (l.usage === 'saisonnier' || l.usage === 'residence_secondaire') rev = `Revenu Est.: ${l.revenuSaisonnierAnnuel}€/an`;
-        return `- ${l.nom} (${l.surface}m², ${l.usage}): ${rev}`;
+        if (l.usage === 'locatif_nu' || l.usage === 'locatif_meuble' || l.usage === 'commercial') rev = `Loyer: ${l.loyerMensuel} €/mois`;
+        if (l.usage === 'saisonnier' || l.usage === 'residence_secondaire') rev = `Revenu Est.: ${l.revenuSaisonnierAnnuel} €/an`;
+        return `- ${l.nom} (${l.surface} m², usage: ${l.usage}): ${rev}`;
       }).join('\n');
     
     prompt = `
-        Agis en tant qu'expert en investissement immobilier senior. Analyse ce projet en France.
+        ${commonInstructions}
+        CONTEXTE : Note de synthèse d'analyse de risque destinée à un comité d'engagement bancaire.
 
-        PROFIL INVESTISSEUR(S) :
+        PROFIL DES EMPRUNTEURS :
         ${partnersDesc}
-        - Revenus fonciers existants (bruts): ${data.revenusFonciersExistants}€/mois
-        - Apport: ${data.apportDisponible}€
-        - Charges/Crédits actuels: ${data.chargesFoyer}€
+        - Solvabilité actuelle : Engagements de crédits de ${data.creditsExistants} € pour un revenu foyer de ${results.revenusFoyerTotal} €.
+        - Reste à vivre actuel : ${results.resteAVivreMensuel + results.mensualiteTotale} € (avant nouvelle opération).
 
-        LE PROJET IMMOBILIER :
-        - Prix achat: ${data.prixBien}€
+        DÉTAILS DE L'OPÉRATION IMMOBILIÈRE :
+        - Coût d'acquisition consolidé : ${results.coutTotalProjet.toFixed(0)} €
+        - Montant du financement sollicité : ${data.montantEmprunte} € sur ${data.dureeEmpruntAnnee} ans.
         ${lotsDesc}
-        - Emprunt: ${data.montantEmprunte}€ sur ${data.dureeEmpruntAnnee} ans
         
-        INFORMATIONS COMPLÉMENTAIRES (CONTEXTE) :
-        "${data.contexteProjet || 'Aucun contexte spécifié'}"
+        INDICATEURS DE SYNTHÈSE :
+        - Taux d'endettement projeté : ${results.tauxEndettementApres.toFixed(2)} % (Référentiel HCSF : 35%).
+        - Reste à vivre projeté : ${results.resteAVivreMensuel.toFixed(0)} €.
+        - Rendement net estimé : ${results.rentabiliteNette.toFixed(2)} %.
 
-        RÉSULTATS FINANCIERS CALCULÉS :
-        - Coût total projet: ${results.coutTotalProjet.toFixed(0)}€
-        - Cashflow Mensuel Net: ${results.cashflowMensuel.toFixed(0)}€
-        - Rentabilité Nette: ${results.rentabiliteNette.toFixed(2)}%
-        - Taux d'endettement final: ${results.tauxEndettementApres.toFixed(2)}%
-
-        MISSION :
-        1. **Solidité du Dossier**: Analyse l'impact des statuts et du taux d'endettement.
-        2. **Analyse du Contexte**: Commente les infos complémentaires (emplacement, garanties historiques sur factures, vision long terme). Est-ce réaliste ?
-        3. **Stratégie & Risque**: Le cashflow est-il sain ?
-        4. **Conseil Fiscal**: Suggère un régime (LMNP, SCI, etc.) selon le profil.
-
-        Format Markdown, ton professionnel mais direct.
+        VOTRE ANALYSE :
+        1. Évaluation de la viabilité du montage financier et conformité aux ratios bancaires usuels.
+        2. Analyse de la pérennité du modèle locatif présenté.
+        3. Recommandations stratégiques sur l'optimisation fiscale ou structurelle de l'opération.
+        4. Conclusion synthétique sur la faisabilité de l'engagement bancaire.
     `;
   }
 
@@ -89,9 +82,9 @@ export const analyzeInvestment = async (data: SimulationData, results: Simulatio
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    return response.text || "Impossible de générer l'analyse.";
+    return response.text || "Analyse indisponible.";
   } catch (error) {
     console.error("Erreur Gemini:", error);
-    return "Une erreur est survenue lors de l'analyse IA.";
+    return "Erreur lors de la génération de la note de synthèse.";
   }
 };
